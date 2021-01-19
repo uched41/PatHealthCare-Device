@@ -68,9 +68,8 @@ static void max30003_fclck_setup(void){
   APP_ERROR_CHECK(err_code);
 
   uint32_t ticks = nrf_drv_timer_us_to_ticks(&clk_timer, 31);
-  printf("%d\n", ticks);//, 16 -> 1us
 
-  nrf_drv_timer_extended_compare(&clk_timer, NRF_TIMER_CC_CHANNEL0, 250, 
+  nrf_drv_timer_extended_compare(&clk_timer, NRF_TIMER_CC_CHANNEL0, 245, 
         NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
   nrf_drv_timer_enable(&clk_timer);
 
@@ -145,6 +144,8 @@ void max30003_init(void){
   APP_ERROR_CHECK(nrf_drv_gpiote_in_init(MAX30003_INT1, &in_config, max30003_cb));
 
   max30003_fclck_setup();
+  //APP_ERROR_CHECK(nrf_drv_gpiote_out_init(MAX30003_FCLK, &out_config));
+
 
   /* Reg Init */
   max30003_reg_init();
@@ -285,7 +286,11 @@ void max30003_fifo_rst(void){
 void max30003_loop(void){
   uint32_t val;
   max30003_read_reg(_ECG3_STAT_REG , &val);
+  max30003_fifo_rst();
   //max30003_read_reg(_ECG3_ECG_FIFO_REG , &val);
   LOGD("0x%X", val);
-  nrf_delay_ms(1000);
+  //nrf_drv_gpiote_out_clear(MAX30003_FCLK);
+  nrf_delay_ms(500);
+  //nrf_drv_gpiote_out_set(MAX30003_FCLK);
+  //nrf_delay_ms(500);
 }

@@ -535,12 +535,26 @@ static void advertising_start(bool erase_bonds)
         APP_ERROR_CHECK(err_code);
     }
 }
+void lfclk_config()
+{
+  NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos);
+  NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
+  //NRF_CLOCK->LFCLKSRC |= (CLOCK_LFCLKSRC_BYPASS_Enabled << CLOCK_LFCLKSRC_BYPASS_Pos);
+  NRF_CLOCK->TASKS_LFCLKSTART = 1;
+  while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0) {}
+
+  NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
+  NRF_CLOCK->TASKS_HFCLKSTART    = 1;
+  while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0){}
+
+}
 
 
 /**@brief Function for application main entry.
  */
 int main(void)
 {
+    lfclk_config();
     bool erase_bonds;
     init_logger();
 
