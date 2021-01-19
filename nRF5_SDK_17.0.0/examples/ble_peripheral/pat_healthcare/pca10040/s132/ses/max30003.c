@@ -89,7 +89,24 @@ static void max30003_fclck_setup(void){
 
 /* MAX30003 Interrupt handler */
 void max30003_cb(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
-  LOGD("Int");
+  //LOGD("Int");
+  max30003_int_evt_type_t evt =  max30003_get_int_event();
+  switch(evt){
+    case MAX30003_FIFO_EVT:
+      break;
+
+    case MAX30003_RR_EVT:
+      break;
+
+    case MAX30003_LDOFF_EVT:
+      break;
+
+    case MAX30003_LDON_EVT:
+      break;
+
+    default:
+      break;
+  }
 }
 
 
@@ -289,8 +306,5 @@ void max30003_loop(void){
   max30003_fifo_rst();
   //max30003_read_reg(_ECG3_ECG_FIFO_REG , &val);
   LOGD("0x%X", val);
-  //nrf_drv_gpiote_out_clear(MAX30003_FCLK);
   nrf_delay_ms(500);
-  //nrf_drv_gpiote_out_set(MAX30003_FCLK);
-  //nrf_delay_ms(500);
 }
