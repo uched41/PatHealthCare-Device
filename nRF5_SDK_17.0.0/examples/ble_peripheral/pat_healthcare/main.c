@@ -554,7 +554,7 @@ void lfclk_config()
  */
 int main(void)
 {
-    lfclk_config();
+    //lfclk_config();
     bool erase_bonds;
     init_logger();
 

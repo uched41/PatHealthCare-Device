@@ -4,7 +4,9 @@
 #include "max30003_reg.h"
 #include "max30003.h"
 #include "hardware.h"
+#include "ble_transfer_queue.h"
 
+#include "string.h"
 #include "app_error.h"
 #include "nrf_drv_spi.h"
 #include "nrf_drv_gpiote.h"
@@ -18,6 +20,8 @@
 extern const nrf_drv_spi_t    gen_spi;
 static nrf_ppi_channel_t      ppi_channel;
 static const nrf_drv_timer_t  clk_timer = NRF_DRV_TIMER_INSTANCE(MAX30003_CLK_TIMER);
+
+static max30003_ecg_data_packet ecg_data;
 
 /* Write MAX30003 Register */
 static void max30003_write_reg(uint8_t reg, uint32_t data){
@@ -34,16 +38,11 @@ static void max30003_write_reg(uint8_t reg, uint32_t data){
 
 /* Read MAX30003 Register */
 static void max30003_read_reg(uint8_t reg, uint32_t* data){
-  uint8_t in_buf[4];
+  uint8_t in_buf = (reg << 1) | RREG;;
   uint8_t out_buf[4];
 
-  in_buf[0] = (reg << 1) | RREG;
-  in_buf[1] = _ECG3_DUMMY_BYTE;
-  in_buf[2] = _ECG3_DUMMY_BYTE;
-  in_buf[3] = _ECG3_DUMMY_BYTE;
-
   MAX30003_CS_LOW();
-  APP_ERROR_CHECK(nrf_drv_spi_transfer(&gen_spi, in_buf, 4, out_buf, 4+1));
+  APP_ERROR_CHECK(nrf_drv_spi_transfer(&gen_spi, &in_buf, 1, out_buf, 4+1));
   MAX30003_CS_HIGH();
 
   *data = (out_buf[1] << 16) | (out_buf[2] << 8) | (out_buf[3]);
@@ -89,24 +88,24 @@ static void max30003_fclck_setup(void){
 
 /* MAX30003 Interrupt handler */
 void max30003_cb(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
-  //LOGD("Int");
-  max30003_int_evt_type_t evt =  max30003_get_int_event();
-  switch(evt){
-    case MAX30003_FIFO_EVT:
-      break;
+  uint32_t val =  max30003_read_status();
+  //LOGD("INT 0x%X", val);
 
-    case MAX30003_RR_EVT:
-      break;
-
-    case MAX30003_LDOFF_EVT:
-      break;
-
-    case MAX30003_LDON_EVT:
-      break;
-
-    default:
-      break;
+  if(val & _ECG3_RRINT_MASK){
+    LOGD("RR INT");
   }
+  if(val & _ECG3_EINT_MASK){
+    max30003_read_fifo();
+    //LOGD("FIFO FULL INT");
+  }
+  if(val & _ECG3_EOVF_MASK){
+    max30003_fifo_rst();
+    LOGD("FIFO OVF INT");
+  }
+  if(val & _ECG3_DCLOFF_INT_MASK){
+    LOGD("LDOFF INT");
+  }
+
 }
 
 
@@ -129,7 +128,7 @@ void max30003_reg_init(void){
   );
 
   max30003_write_reg( _ECG3_CNFG_ECG_REG, 
-    0x800000 | _ECG3_DHPF_500MILIHZ | _ECG3_DLPF_40HZ   // 128 sps
+    0x400000 | _ECG3_DHPF_500MILIHZ | _ECG3_DLPF_40HZ   // 0x8->128 sps, 0x4->256
   );
 
   max30003_write_reg( _ECG3_CNFG_RTOR1_REG,             // RTOR Configuration
@@ -144,7 +143,7 @@ void max30003_int_enable(void){
            This value can be configured in MNGR_INT REG */ 
   max30003_write_reg( _ECG3_EN_INT_REG, 
     _ECG3_EINT_MASK | _ECG3_RRINT_MASK | _ECG3_DCLOFF_INT_MASK | _ECG3_LONINT_MASK |
-    _ECG3_SAMP_INT_MASK | _ECG3_INTB_OD_NMOS | _ECG3_PLLINT_MASK
+     _ECG3_INTB_CMOS 
   );
 }
 
@@ -169,6 +168,11 @@ void max30003_init(void){
   max30003_read_info();
   max30003_int_enable();
   max30003_synch();
+
+  /* Clear Status and FIFO Reg */
+  uint32_t val;
+  max30003_read_reg(_ECG3_STAT_REG , &val);
+  max30003_fifo_rst();
   nrf_delay_ms(100);
 
   LOGD("Init complete.");
@@ -178,6 +182,13 @@ void max30003_init(void){
 /* Enable interrupts to start sampling */
 void max30003_start_sampling(void){
   nrf_drv_gpiote_in_event_enable(MAX30003_INT1, true);
+
+  /* Clear Status and FIFO Reg */
+  uint32_t val;
+  max30003_read_reg(_ECG3_STAT_REG , &val);
+  max30003_fifo_rst();
+
+  ecg_data.cnt = 0;
   LOGD("Sampling started");
 }
 
@@ -204,15 +215,11 @@ void max30003_set_mode(max30003_data_mode_t mode){
 
 
 /* Put MAX30003 Sensor in low-power sleep mode */
-void max30003_sleep(void){
-  
-}
+void max30003_sleep(void){}
 
 
 /* Wake MAX30003 Sensor from sleep */
-void max30003_wakeup(void){
-  
-}
+void max30003_wakeup(void){}
 
 
 /* Get HR Data */
@@ -260,24 +267,10 @@ max30003_hr_rr_data_t max30003_get_hr_rr(void){
 
 
 /* Get Interrupt Event type */
-max30003_int_evt_type_t max30003_get_int_event(void){
+uint32_t max30003_read_status(void){
   uint32_t val;
   max30003_read_reg(_ECG3_STAT_REG , &val);
-
-  if(val & _ECG3_RRINT_MASK){
-    return MAX30003_RR_EVT;
-  }
-  else if(val & _ECG3_EINT_MASK){
-    return MAX30003_FIFO_EVT;
-  }
-  else if(val & _ECG3_DCLOFF_INT_MASK){
-    return MAX30003_LDOFF_EVT;
-  }
-  else if(val & _ECG3_DCLOFF_INT_MASK){
-    return MAX30003_LDON_EVT;
-  }
-
-  return MAX30003_OTHER_EVT;
+  return val;
 }
 
 
@@ -300,11 +293,29 @@ void max30003_fifo_rst(void){
 }
 
 
-void max30003_loop(void){
-  uint32_t val;
-  max30003_read_reg(_ECG3_STAT_REG , &val);
-  max30003_fifo_rst();
-  //max30003_read_reg(_ECG3_ECG_FIFO_REG , &val);
-  LOGD("0x%X", val);
-  nrf_delay_ms(500);
+/* Read FIFO Data */
+void max30003_read_fifo(void){
+  /* FIFO Interrupt is sent when there are 16 unread samples */
+  uint8_t in_buf = (_ECG3_ECG_FIFO_BURST_REG << 1) | RREG;
+  uint8_t out_buf[51+1];
+
+  MAX30003_CS_LOW();
+  APP_ERROR_CHECK(nrf_drv_spi_transfer(&gen_spi, &in_buf, 1, out_buf, 51+1));
+  MAX30003_CS_HIGH();
+
+  if(ecg_data.cnt < RAW_ECG_PACKET_LENGTH){
+    memcpy(&ecg_data.buf[ecg_data.cnt], &out_buf[1], 48);
+    ecg_data.cnt += 48;
+
+    if(ecg_data.cnt >= RAW_ECG_PACKET_LENGTH){  // Packet filled
+      ble_add_to_queue(ecg_data.buf, ecg_data.cnt, BLE_QUEUE_DATA_PRIORITY);
+      ecg_data.cnt = 0;
+    }
+  }
+  else{
+    ecg_data.cnt = 0;
+  }
+
 }
+
+void max30003_loop(void){}

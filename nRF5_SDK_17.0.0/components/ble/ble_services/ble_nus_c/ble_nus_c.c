@@ -52,6 +52,7 @@
 #include "nrf_log.h"
 NRF_LOG_MODULE_REGISTER();
 
+extern void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_len);
 
 /**@brief Function for intercepting the errors of GATTC and the BLE GATT Queue.
  *
@@ -134,8 +135,13 @@ static void on_hvx(ble_nus_c_t * p_ble_nus_c, ble_evt_t const * p_ble_evt)
         ble_nus_c_evt.p_data   = (uint8_t *)p_ble_evt->evt.gattc_evt.params.hvx.data;
         ble_nus_c_evt.data_len = p_ble_evt->evt.gattc_evt.params.hvx.len;
 
-        p_ble_nus_c->evt_handler(p_ble_nus_c, &ble_nus_c_evt);
-        NRF_LOG_DEBUG("Client sending data.");
+        // confirm notification 
+        sd_ble_gattc_hv_confirm(p_ble_nus_c->conn_handle, p_ble_nus_c->handles.nus_tx_handle);
+        
+        ble_nus_chars_received_uart_print(ble_nus_c_evt.p_data, ble_nus_c_evt.data_len);
+
+        //p_ble_nus_c->evt_handler(p_ble_nus_c, &ble_nus_c_evt);
+        //NRF_LOG_INFO("Client sending data.");
     }
 }
 

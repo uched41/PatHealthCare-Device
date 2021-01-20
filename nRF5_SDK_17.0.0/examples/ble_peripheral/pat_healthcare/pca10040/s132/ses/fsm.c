@@ -10,6 +10,7 @@
 #include "ticker.h"
 #include "sensors.h"
 #include "ble_transfer_queue.h"
+#include "max30003.h"
 
 device_status_t device_status = {
   .state        = STATE_STARTUP,

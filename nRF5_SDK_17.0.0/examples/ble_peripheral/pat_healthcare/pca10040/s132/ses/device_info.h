@@ -1,4 +1,4 @@
-#define DEVICE_NAME           "Pat"
+#define DEVICE_NAME           "PAT 🐶🐶🐶"
 #define MANUFACTURER_NAME     "PAT Healthcare"
 #define MODEL                 "PAT.R1.1"
 #define SOFTWARE_REVISION     "2.0.0"

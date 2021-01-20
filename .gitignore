@@ -50,6 +50,7 @@ nRF5_SDK_17.0.0/*
 nRF5_SDK_17.0.0/examples/*
 !nRF5_SDK_17.0.0/examples/ble_peripheral/
 !nRF5_SDK_17.0.0/examples/dfu/
+!nRF5_SDK_17.0.0/examples/ble_central/
 
 # Exclude DFU
 nRF5_SDK_17.0.0/examples/dfu/*

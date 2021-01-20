@@ -17,7 +17,7 @@ tq_ret_t ble_send_func(uint8_t* buf, uint16_t len){
 }
 
 /* Add BLE Packet to Queue */
-static uint8_t ble_add_to_queue( uint8_t* buf, uint8_t len, uint8_t priority){
+uint8_t ble_add_to_queue( uint8_t* buf, uint8_t len, uint8_t priority){
   if(buf == NULL) return 1;
   if((!device_status.ble_ready)) return 1;
   return transfer_queue_add(ble_packet_queues, buf, len, priority);
