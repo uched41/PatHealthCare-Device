@@ -233,38 +233,30 @@ void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_len)
     NRF_LOG_INFO("Receiving data %d", data_len);
 
     for(int i=0; i<data_len/3; i++){
+
+      if( p_data[i*3+2] & 0b00111000 ){
+        NRF_LOG_INFO("INVALID");
+        continue;
+      }
+
       uint32_t data = (p_data[i*3] << 16) | (p_data[i*3+1] << 8) | (p_data[i*3+2]);
       data = data >> 6;
 
-      long ldata = (data | 0xFFFC0000);
-
-      //int k = sprintf(snum, "%d\n", data);
-      //print_arr(snum, k);
+      long ldata = 0;
+      
+      if(p_data[i*3] & 0x80){  // Negative number
+        ldata = (data | 0xFFFC0000);
+      }
+      else{
+        ldata = (data & 0x0003FFFF);
+      }
 
       NRF_LOG_INFO("%d %d", i, ldata);
       printf("%d", ldata);
       while (app_uart_put('\n') == NRF_ERROR_BUSY);
     }
     return;
-    for (uint32_t i = 0; i < data_len; i++)
-    {
-        do
-        {
-            ret_val = app_uart_put(p_data[i]);
-            if ((ret_val != NRF_SUCCESS) && (ret_val != NRF_ERROR_BUSY))
-            {
-                NRF_LOG_ERROR("app_uart_put failed for index 0x%04x.", i);
-                APP_ERROR_CHECK(ret_val);
-            }
-        } while (ret_val == NRF_ERROR_BUSY);
-    }
-    if (p_data[data_len-1] == '\r')
-    {
-        while (app_uart_put('\n') == NRF_ERROR_BUSY);
-    }
-   
 }
-
 
 /**@brief   Function for handling app_uart events.
  *

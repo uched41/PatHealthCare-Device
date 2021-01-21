@@ -128,7 +128,7 @@ void max30003_reg_init(void){
   );
 
   max30003_write_reg( _ECG3_CNFG_ECG_REG, 
-    0x400000 | _ECG3_DHPF_500MILIHZ | _ECG3_DLPF_40HZ   // 0x8->128 sps, 0x4->256
+    0x000000 | _ECG3_DHPF_500MILIHZ | _ECG3_DLPF_40HZ   // 0x8->128 sps, 0x4->256, 0x00->512
   );
 
   max30003_write_reg( _ECG3_CNFG_RTOR1_REG,             // RTOR Configuration
